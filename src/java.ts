@@ -10,25 +10,22 @@ class MissingSemicolon implements Completer {
     recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
         return findSyntaxNode(node, ['expression_statement', 'local_variable_declaration']);
     }
+
+	valid(node: Parser.SyntaxNode): boolean {
+		return node.text.endsWith(';');
+	}
+
     async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) { 
         const endPosition = node.endPosition;
-        var semicolon = '';
-        if (!node.text.endsWith(';')) {
-            semicolon = ';';
-        }
-        if (options.newLine) {
-            semicolon = semicolon + '\n';
-        }
-        if (options.moveCursor) {
-            semicolon = semicolon + '$0';
-        }
-        if (semicolon !== '') { 
-            await editor.insertSnippet(
-                new vscode.SnippetString(semicolon),
-                new vscode.Position(endPosition.row, endPosition.column)
-            );
-        }
-    } 
+        await editor.edit(editBuilder => {
+			const position = new vscode.Position(endPosition.row, endPosition.column);
+			editBuilder.insert(position, ';');
+		});
+		if (options.moveCursor) {
+			const range = editor.document.lineAt(endPosition.row).range;
+			editor.selection = new vscode.Selection(range.end, range.end);
+		}
+    }
 }
 
 export function createIndent(editor: vscode.TextEditor, node: Parser.SyntaxNode): string {

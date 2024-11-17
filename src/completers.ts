@@ -9,6 +9,7 @@ export class Options {
 }
 
 export interface Completer {
-    recover(node : Parser.SyntaxNode): Parser.SyntaxNode | null
-    fix(node : Parser.SyntaxNode, editor: TextEditor, options: Options):Promise<void>
+    recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null
+    valid(node: Parser.SyntaxNode): boolean
+    fix(node : Parser.SyntaxNode, editor: TextEditor, options: Options):PromiseLike<void>
 }

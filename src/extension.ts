@@ -30,7 +30,10 @@ async function complete(options: Options) {
 		for (const completer of build()) {
 			const problem = completer.recover(node);
 			if (problem !== null) {
-				await completer.fix(problem, editor, options);
+				if (!completer.valid(problem)) {
+					await completer.fix(problem, editor, options);
+					break;
+				}
 			}
 		};
 	}
