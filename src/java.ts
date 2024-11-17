@@ -3,7 +3,11 @@ import Parser = require('tree-sitter');
 import { Completer, Options } from './completers';
 
 export function build(): Array<Completer> {
-    return [new MissingSemicolon(), new MethodBody()];
+    return [
+		new MissingSemicolon(), 
+		new MethodBody(),
+		new IfStmtBody(),
+	];
 }
 
 class MissingSemicolon implements Completer {
@@ -28,16 +32,12 @@ class MissingSemicolon implements Completer {
     }
 }
 
-class MethodBody implements Completer {
-	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-        return findSyntaxNode(node, ['method_declaration']);
-    }
+abstract class MissingBody implements Completer {
+	abstract recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null
+	abstract valid(node: Parser.SyntaxNode): boolean
+	abstract fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options): PromiseLike<void>
 
-	valid(node: Parser.SyntaxNode): boolean {
-		return node.children.find((v) => v.type === 'block') !== undefined;
-	}
-
-	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
+	async appendBody(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
 		const endPosition = node.endPosition;
 		const position = new vscode.Position(endPosition.row, endPosition.column);
 		if (options.moveCursor) {
@@ -57,12 +57,33 @@ class MethodBody implements Completer {
 	}
 }
 
-export function findMethodNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-	return findSyntaxNode(node, ['method_declaration']);
+class MethodBody extends MissingBody {
+	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+        return findSyntaxNode(node, ['method_declaration']);
+    }
+
+	valid(node: Parser.SyntaxNode): boolean {
+		return node.children.find((v) => v.type === 'block') !== undefined;
+	}
+
+	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
+		this.appendBody(node, editor, options);
+	}
 }
 
-export function findIfStatementNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-	return findSyntaxNode(node, ['if_statement']);
+class IfStmtBody extends MissingBody {
+	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+        return findSyntaxNode(node, ['if_statement']);
+    }
+
+	valid(node: Parser.SyntaxNode): boolean {
+		return node.children.find((v) => v.type === 'block') !== undefined;
+	}
+
+	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
+		const parenthesis = node.children.find((v) => v.type === 'parenthesized_expression') as Parser.SyntaxNode;
+		this.appendBody(parenthesis, editor, options);
+	}
 }
 
 function findSyntaxNode(node: Parser.SyntaxNode, types: Array<string>): Parser.SyntaxNode | null {
