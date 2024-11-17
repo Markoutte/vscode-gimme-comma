@@ -109,7 +109,11 @@ function fixIndentation(snippet: string, node: Parser.SyntaxNode, editor: vscode
 		if (char === '\t') {
 			result.push(createIndent(node, editor.options));
 		} else if (char === '\n') {
-			result.push('\n');
+			if (editor.document.eol === vscode.EndOfLine.CRLF) {
+				result.push('\r\n');
+			} else {
+				result.push('\n');
+			}
 			result.push(createIndent(node, editor.options));
 		} else {
 			result.push(char);
