@@ -3,7 +3,7 @@ import Parser = require('tree-sitter');
 import { Completer, Options } from './completers';
 
 export function build(): Array<Completer> {
-    return [new MissingSemicolon()];
+    return [new MissingSemicolon(), new MethodBody()];
 }
 
 class MissingSemicolon implements Completer {
@@ -28,34 +28,33 @@ class MissingSemicolon implements Completer {
     }
 }
 
-export function createIndent(editor: vscode.TextEditor, node: Parser.SyntaxNode): string {
-	const level = calculateIndention(node);
-	var size = editor.options.indentSize;
-	if (typeof size !== 'number') {
-		size = 1;
-	}
-	if (editor.options.insertSpaces) {
-		return " ".repeat(level * size);
-	} else {
-		return "\t".repeat(level);
-	}
-}
+class MethodBody implements Completer {
+	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+        return findSyntaxNode(node, ['method_declaration']);
+    }
 
-export function calculateIndention(node: Parser.SyntaxNode): number {
-	var level = 0;
-	var current: Parser.SyntaxNode | null = node;
-	while (current !== null) {
-		current = current.parent;
-		if (['block', 'class_declaration'].includes(current?.type ?? "")) {
-			level++;
+	valid(node: Parser.SyntaxNode): boolean {
+		return node.children.find((v) => v.type === 'block') !== undefined;
+	}
+
+	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
+		const endPosition = node.endPosition;
+		const position = new vscode.Position(endPosition.row, endPosition.column);
+		if (options.moveCursor) {
+			const bodySnippet = " {\n\t${0}\n}";
+			editor.insertSnippet(
+				new vscode.SnippetString(bodySnippet),
+				position
+			);
+		} else {
+			editor.edit(editBuilder => {
+				editBuilder.insert(
+					position,
+					fixIndentation(" {\n\t\n}", node, editor)
+				);
+			});
 		}
 	}
-	return level;
-}
-
-
-export function findExpressionNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-	return findSyntaxNode(node, ['expression_statement', 'local_variable_declaration']);
 }
 
 export function findMethodNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
@@ -75,4 +74,45 @@ function findSyntaxNode(node: Parser.SyntaxNode, types: Array<string>): Parser.S
 		current = current.parent;
 	}
 	return current;
+}
+
+function fixIndentation(snippet: string, node: Parser.SyntaxNode, editor: vscode.TextEditor): string {
+	let result = [];
+	for (let index = 0; index < snippet.length; index++) {
+		const char = snippet[index];
+		if (char === '\t') {
+			result.push(createIndent(node, editor.options));
+		} else if (char === '\n') {
+			result.push('\n');
+			result.push(createIndent(node, editor.options));
+		} else {
+			result.push(char);
+		}
+	}
+	return result.join("");
+}
+
+function createIndent(node: Parser.SyntaxNode, options: vscode.TextEditorOptions): string {
+	const level = calculateIndention(node);
+	var size = options.indentSize;
+	if (typeof size !== 'number') {
+		size = 1;
+	}
+	if (options.insertSpaces) {
+		return " ".repeat(level * size);
+	} else {
+		return "\t".repeat(level);
+	}
+}
+
+function calculateIndention(node: Parser.SyntaxNode): number {
+	var level = 0;
+	var current: Parser.SyntaxNode | null = node;
+	while (current !== null) {
+		current = current.parent;
+		if (['block', 'class_declaration'].includes(current?.type ?? "")) {
+			level++;
+		}
+	}
+	return level;
 }
