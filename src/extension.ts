@@ -2,8 +2,6 @@
 
 import * as vscode from 'vscode';
 import Parser = require('tree-sitter');
-import Java from 'tree-sitter-java';
-import { build } from './java';
 import { Options } from './completers';
 
 export function activate(context: vscode.ExtensionContext) { 
@@ -15,19 +13,31 @@ export function activate(context: vscode.ExtensionContext) {
 	}));
 }
 
+const supportedLanguages = ["java"];
+
 async function complete(options: Options) {
 	const parser = new Parser();
-	parser.setLanguage(Java);
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) {
 		return;
 	}
+	const languageId = editor.document.languageId;
+	if (!supportedLanguages.includes(languageId)) {
+		return;
+	}
+	try {
+		var bundle = await import(`./languages/${languageId}.js`);
+	} catch (e) {
+		console.error(e);
+		return;
+	}
+	parser.setLanguage(bundle.language());
 	var tree = parser.parse(editor.document.getText());
 	var selection = editor.selection.active;
 	const node = findNodeFor(tree.rootNode, selection);
 
 	if (node !== null) {
-		for (const completer of build()) {
+		for (const completer of bundle.allCompleters()) {
 			const problem = completer.recover(node);
 			if (problem !== null) {
 				if (!completer.valid(problem)) {

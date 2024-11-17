@@ -1,13 +1,18 @@
 import * as vscode from 'vscode';
 import Parser = require('tree-sitter');
-import { Completer, Options } from './completers';
+import Java from 'tree-sitter-java';
+import { Completer, Options } from '../completers';
 
-export function build(): Array<Completer> {
-    return [
+export function allCompleters(): Array<Completer> {
+	return [
 		new MissingSemicolon(), 
 		new MethodBody(),
 		new IfStmtBody(),
 	];
+}
+
+export function language() {
+	return Java;
 }
 
 class MissingSemicolon implements Completer {
