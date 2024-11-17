@@ -1,5 +1,35 @@
 import * as vscode from 'vscode';
 import Parser = require('tree-sitter');
+import { Completer, Options } from './completers';
+
+export function build(): Array<Completer> {
+    return [new MissingSemicolon()];
+}
+
+class MissingSemicolon implements Completer {
+    recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+        return findSyntaxNode(node, ['expression_statement', 'local_variable_declaration']);
+    }
+    async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) { 
+        const endPosition = node.endPosition;
+        var semicolon = '';
+        if (!node.text.endsWith(';')) {
+            semicolon = ';';
+        }
+        if (options.newLine) {
+            semicolon = semicolon + '\n';
+        }
+        if (options.moveCursor) {
+            semicolon = semicolon + '$0';
+        }
+        if (semicolon !== '') { 
+            await editor.insertSnippet(
+                new vscode.SnippetString(semicolon),
+                new vscode.Position(endPosition.row, endPosition.column)
+            );
+        }
+    } 
+}
 
 export function createIndent(editor: vscode.TextEditor, node: Parser.SyntaxNode): string {
 	const level = calculateIndention(node);
@@ -26,22 +56,6 @@ export function calculateIndention(node: Parser.SyntaxNode): number {
 	return level;
 }
 
-export function findNodeFor(node: Parser.SyntaxNode, selection: vscode.Position): Parser.SyntaxNode | null {
-	var sp = node.startPosition;
-	var ep = node.endPosition;
-	if (isInRange(selection.line, sp.row, ep.row) && 
-		isInRange(selection.character, sp.column, ep.column)) {
-		return node;
-	}
-	var retval = null;
-	for (const child of node.children) {
-		retval = findNodeFor(child, selection);
-		if (retval !== null) {
-			break;
-		}
-}	
-	return retval;
-}
 
 export function findExpressionNode(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
 	return findSyntaxNode(node, ['expression_statement', 'local_variable_declaration']);
@@ -64,13 +78,4 @@ function findSyntaxNode(node: Parser.SyntaxNode, types: Array<string>): Parser.S
 		current = current.parent;
 	}
 	return current;
-}
-
-// This method is called when your extension is deactivated
-export function deactivate() {}
-
-// Utilities
-
-function isInRange(value: number, from: number, to: number) {
-	return from <= value && value <= to;
 }
