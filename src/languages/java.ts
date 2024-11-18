@@ -8,6 +8,7 @@ export function allCompleters(): Array<Completer> {
 		new MissingSemicolon(), 
 		new MethodBody(),
 		new IfStmtBody(),
+		new IncompleteClassDeclaration,
 	];
 }
 
@@ -17,7 +18,12 @@ export function language() {
 
 class MissingSemicolon implements Completer {
     recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
-        return findSyntaxNode(node, ['expression_statement', 'local_variable_declaration']);
+        return findSyntaxNode(node, [
+			'expression_statement', 
+			'local_variable_declaration',
+			'throw_statement',
+			'return_statement',
+		]);
     }
 
 	valid(node: Parser.SyntaxNode): boolean {
@@ -47,16 +53,22 @@ abstract class MissingBody implements Completer {
 		const position = new vscode.Position(endPosition.row, endPosition.column);
 		if (options.moveCursor) {
 			const bodySnippet = " {\n\t${0}\n}";
-			editor.insertSnippet(
+			await editor.insertSnippet(
 				new vscode.SnippetString(bodySnippet),
 				position
 			);
 		} else {
-			editor.edit(editBuilder => {
+			var selection = editor.selection;
+			await editor.edit(editBuilder => {
 				editBuilder.insert(
 					position,
 					fixIndentation(" {\n\t\n}", node, editor)
 				);
+			}).then(() => {
+				// restore selection if insertion moved it
+				if (editor.selection !== selection) {
+					editor.selection = selection;
+				}
 			});
 		}
 	}
@@ -88,6 +100,37 @@ class IfStmtBody extends MissingBody {
 	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
 		const parenthesis = node.children.find((v) => v.type === 'parenthesized_expression') as Parser.SyntaxNode;
 		this.appendBody(parenthesis, editor, options);
+	}
+}
+
+class IncompleteClassDeclaration extends MissingBody {
+	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+		var errorNode = findSyntaxNode(node, ['ERROR']);
+		if (errorNode === null) {
+			var programNode = findSyntaxNode(node, ['program']);
+			if (programNode !== null &&
+				programNode.childCount === 1 &&
+				programNode.children[0].type === 'ERROR'
+			) {
+				errorNode = programNode.children[0];
+			}
+		}
+		if (errorNode !== null &&
+			errorNode.childCount === 2 &&
+			errorNode.children[0].type === 'class' &&
+			errorNode.children[1].type === 'identifier'
+		) {
+			return errorNode;
+		}
+        return null;
+    }
+
+	valid(node: Parser.SyntaxNode): boolean {
+		return false;
+	}
+
+	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor, options: Options) {
+		await this.appendBody(node, editor, options);
 	}
 }
 

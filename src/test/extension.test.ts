@@ -1,15 +1,32 @@
 import * as assert from 'assert';
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
 import * as vscode from 'vscode';
-// import * as myExtension from '../../extension';
+import * as myExtension from '../extension';
+import { Options } from '../completers';
+
+async function runTest(
+		original: string,
+		options: Options = new Options(),
+): Promise<string> {
+	var number = original.indexOf('<!cursor!>');
+	const document = await vscode.workspace.openTextDocument({
+		"language": 'java',
+		"content": original.replace('<!cursor!>', '')
+	});
+	const editor = await vscode.window.showTextDocument(document);
+	const position = editor.document.positionAt(number);
+	editor.selection = new vscode.Selection(position, position);
+	await myExtension.complete(options, editor);
+	const text = editor.document.getText();
+	await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+	return text;
+}
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
 
-	test('Sample test', () => {
-		assert.strictEqual(-1, [1, 2, 3].indexOf(5));
-		assert.strictEqual(-1, [1, 2, 3].indexOf(0));
+	test('Incomplete Class Test', async () => {
+		var text = await runTest('cla<!cursor!>ss A');
+		assert.strictEqual(text, 'class A {\n\n}');
 	});
 });

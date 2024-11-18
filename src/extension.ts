@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import Parser = require('tree-sitter');
-import { Options } from './completers';
+import { Completer, Options } from './completers';
 
 export function activate(context: vscode.ExtensionContext) { 
 	context.subscriptions.push(vscode.commands.registerCommand('complete-statement.complete-line', () => {
@@ -15,9 +15,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 const supportedLanguages = ["java"];
 
-async function complete(options: Options) {
+export async function complete(options: Options, editor: vscode.TextEditor | undefined = undefined) {
 	const parser = new Parser();
-	const editor = vscode.window.activeTextEditor;
+	editor = editor ?? vscode.window.activeTextEditor;
 	if (!editor) {
 		return;
 	}
@@ -37,7 +37,7 @@ async function complete(options: Options) {
 	const node = findNodeFor(tree.rootNode, selection);
 
 	if (node !== null) {
-		for (const completer of bundle.allCompleters()) {
+		for (var completer of bundle.allCompleters() as Array<Completer>) {
 			const problem = completer.recover(node);
 			if (problem !== null) {
 				if (!completer.valid(problem)) {
