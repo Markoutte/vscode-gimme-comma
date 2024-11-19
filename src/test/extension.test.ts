@@ -2,11 +2,9 @@ import * as assert from 'assert';
 
 import * as vscode from 'vscode';
 import * as myExtension from '../extension';
-import { Options } from '../completers';
 
 async function runTest(
-		original: string,
-		options: Options = new Options(),
+		original: string
 ): Promise<string> {
 	var number = original.indexOf('<!cursor!>');
 	const document = await vscode.workspace.openTextDocument({
@@ -16,7 +14,7 @@ async function runTest(
 	const editor = await vscode.window.showTextDocument(document);
 	const position = editor.document.positionAt(number);
 	editor.selection = new vscode.Selection(position, position);
-	await myExtension.complete(options, editor);
+	await myExtension.complete(editor);
 	const text = editor.document.getText();
 	await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 	return text;

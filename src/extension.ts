@@ -2,25 +2,21 @@
 
 import * as vscode from 'vscode';
 import Parser = require('tree-sitter');
-import { Completer, Options } from './completers';
+import { Completer } from './completers';
 
 export function activate(context: vscode.ExtensionContext) { 
 	context.subscriptions.push(vscode.commands.registerCommand('complete-statement.complete-line', () => {
-		complete({ ...new Options(), ...{ 'moveCursor' : false, 'newLine' : false }});
-	}));
-	context.subscriptions.push(vscode.commands.registerCommand('complete-statement.complete-line-and-move-cursor', () => {
-		complete({ ...new Options(), ...{ 'moveCursor' : true, 'newLine' : true }});
+		var editor = vscode.window.activeTextEditor;
+		if (editor) {
+			complete(editor);
+		}
 	}));
 }
 
 const supportedLanguages = ["java"];
 
-export async function complete(options: Options, editor: vscode.TextEditor | undefined = undefined) {
+export async function complete(editor: vscode.TextEditor) {
 	const parser = new Parser();
-	editor = editor ?? vscode.window.activeTextEditor;
-	if (!editor) {
-		return;
-	}
 	const languageId = editor.document.languageId;
 	if (!supportedLanguages.includes(languageId)) {
 		return;
@@ -41,7 +37,7 @@ export async function complete(options: Options, editor: vscode.TextEditor | und
 			const problem = completer.recover(node);
 			if (problem !== null) {
 				if (!completer.valid(problem)) {
-					await completer.fix(problem, editor, options);
+					await completer.fix(problem, editor);
 					break;
 				}
 			}
