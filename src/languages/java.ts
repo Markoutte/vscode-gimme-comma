@@ -5,6 +5,7 @@ import { Completer } from '../completers';
 
 export function allCompleters(): Array<Completer> {
 	return [
+		new IncompleteParenthesis(),
 		new MissingSemicolon(), 
 		new MethodBody(),
 		new IfStmtBody(),
@@ -15,6 +16,27 @@ export function allCompleters(): Array<Completer> {
 
 export function language() {
 	return Java;
+}
+
+class IncompleteParenthesis implements Completer {
+	recover(node: Parser.SyntaxNode): Parser.SyntaxNode | null {
+		return findSyntaxNode(node, [
+			'parenthesized_expression'
+		]);
+	}
+
+	valid(node: Parser.SyntaxNode): boolean {
+		return node.childCount === 3 && node.children[2].text === ')';
+	}
+
+	async fix(node: Parser.SyntaxNode, editor: vscode.TextEditor) {
+		const endPosition = node.endPosition;
+		await editor.insertSnippet(
+			new vscode.SnippetString(")"),
+			new vscode.Position(endPosition.row, endPosition.column)
+		);
+	}
+
 }
 
 class MissingSemicolon implements Completer {

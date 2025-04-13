@@ -28,16 +28,20 @@ export async function complete(editor: vscode.TextEditor) {
 		return;
 	}
 	parser.setLanguage(bundle.language());
+
 	var tree = parser.parse(editor.document.getText());
 	var selection = editor.selection.active;
-	const node = findNodeFor(tree.rootNode, selection);
-
-	if (node !== null) {
+	for (var i = 0; i < 10; i++) {
+		const node = findNodeFor(tree.rootNode, selection);
+		if (node === null) {
+			break;
+		}
 		for (var completer of bundle.allCompleters() as Array<Completer>) {
 			const problem = completer.recover(node);
 			if (problem !== null) {
 				if (!completer.valid(problem)) {
 					await completer.fix(problem, editor);
+					// todo tree.edit(...) instead reparsing the whole tree
 					break;
 				}
 			}
